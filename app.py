@@ -3,7 +3,7 @@ import sys
 import json
 import opsgenie_sdk
 app = Flask(__name__)
-opsgenie_api_key = '8fedb235-e7c0-4e2a-907f-05ef3dff1d01' #or your teams opsgenie key
+opsgenie_api_key = '8fedb235-e7c0-4e2a-907f-05ef3dff1d01' #your teams opsgenie key
 
 ls = []
 container_logs = {
@@ -25,7 +25,7 @@ class opsgenieConfig:
         self.api_client = opsgenie_sdk.api_client.ApiClient(configuration=self.conf)
         self.alert_api = opsgenie_sdk.AlertApi(api_client=self.api_client)
 
-    def create(self, description, meteric, value):
+    def create(self, description, meteric, value, priority_code):
         body = opsgenie_sdk.CreateAlertPayload(
         message= 'Anomaly Detected in Web App {}:{}'.format(meteric,value),
         alias='python_sample', #nneds to be unique unless you are overwriting
@@ -42,7 +42,7 @@ class opsgenieConfig:
         details={'key1': 'value1',
                 'key2': 'value2'},
         entity='An example entity',
-        priority='P3')
+        priority=priority_code)
         
         try:
             create_response = self.alert_api.create_alert(create_alert_payload=body)
@@ -61,23 +61,26 @@ def getMain():
         x = request.data.decode("utf-8") # gets data then goes from bytes to string
         x = json.loads(x)
         container_logs[x["name"]] = x["data"]
+        
         anomalies_csbytes = x["insights-logs-appservicehttplogs"][0]["anomalies"]["anomalies"] #Csbytes
         anomalies_Scbytes = x["insights-logs-appservicehttplogs"][1]["anomalies"]["anomalies"] #ScStatus
         anomalies_timeTaken = x["insights-logs-appservicehttplogs"][2]["anomalies"]["anomalies"] #TimeTaken
 
-
         if anomalies_csbytes:
-            createAlert("insights-logs-appservicehttplogs", "CsBytes", -1)
+            value = x["insights-logs-appservicehttplogs"][0]["anomalies"]["anomalies"][0] #Csbytes
+            createAlert("insights-logs-appservicehttplogs", "CsBytes", value, "P3")
         
         if anomalies_Scbytes:
-            createAlert("insights-logs-appservicehttplogs", "ScBytes", -1)
+            value = x["insights-logs-appservicehttplogs"][0]["anomalies"]["anomalies"][0] #Csbytes
+            createAlert("insights-logs-appservicehttplogs", "ScBytes", value, "P2")
 
-        if anomalies_timeTaken:
-            createAlert("insights-logs-appservicehttplogs", "Time Taken", -1)
+        if anomalies_timeTaken:            
+            value = x["insights-logs-appservicehttplogs"][0]["anomalies"]["anomalies"][0] #Csbytes
+            createAlert ("insights-logs-appservicehttplogs", "Time Taken", value, "P1")
 
-        
     return ('Rest API')
 
-def createAlert(description, meteric, value):
+def createAlert(description, meteric, value, priority):
     the_genie = opsgenieConfig(opsgenie_api_key)
-    the_genie.create(description, meteric, value)
+    the_genie.create(description, meteric, value, priority)
+
